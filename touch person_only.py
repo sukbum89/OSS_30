@@ -1,52 +1,49 @@
 import cv2
-import numpy as np
 
 def person_only(input_path, output_path, format='mp4'):
-    # 사람 인식용 Haar Cascade 로드
+    # Load Haar cascade for full-body detection
     person_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_fullbody.xml")
-    
-    if person_cascade.empty():
-        raise ValueError("Cascade Classifier가 제대로 로드되지 않았습니다.")
-    
+
+    # Open the input video
     cap = cv2.VideoCapture(input_path)
-    
     if not cap.isOpened():
-        raise ValueError("비디오 파일을 열 수 없습니다.")
+        raise IOError("Cannot open input video file.")
 
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     fps = int(cap.get(cv2.CAP_PROP_FPS))
 
-    # 형식에 따른 코덱 선택
+    # Select codec based on the format
     if format == 'mp4':
-        if not output_path.endswith('.mp4'):
-            output_path += '.mp4'
+        output_path += ".mp4"
         codec = cv2.VideoWriter_fourcc(*'mp4v')
     elif format == 'avi':
-        if not output_path.endswith('.avi'):
-            output_path += '.avi'
+        output_path += ".avi"
         codec = cv2.VideoWriter_fourcc(*'XVID')
     else:
-        raise ValueError("지원되지 않는 형식입니다. 'mp4' 또는 'avi'를 사용하세요.")
+        raise ValueError("Unsupported format. Use 'mp4' or 'avi'.")
 
     out = cv2.VideoWriter(output_path, codec, fps, (width, height))
 
+    # Process video frames
     while cap.isOpened():
         ret, frame = cap.read()
         if not ret:
             break
 
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        persons = person_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5)
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)  # Convert frame to grayscale
+        persons = person_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
 
-        # 검정 배경 생성
-        mask = np.zeros_like(frame)  # frame과 같은 크기의 검정 배경 생성
+        # Create a black mask
+        mask = frame.copy() * 0
 
+        # Detect and mask people
         for (x, y, w, h) in persons:
             mask[y:y + h, x:x + w] = frame[y:y + h, x:x + w]
 
-        out.write(mask)
+        out.write(mask)  # Write the processed frame to output file
 
     cap.release()
     out.release()
-    print(f"처리 완료된 비디오가 '{output_path}'에 저장되었습니다.")
+
+    print(f"Processing completed. Saved to {output_path}")
